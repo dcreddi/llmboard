@@ -65,7 +65,7 @@ function httpPost(port, urlPath, data) {
   });
 }
 
-describe('E2E — REST API', () => {
+describe('E2E — REST API', { timeout: 30000 }, () => {
   let handle;
 
   before(async () => {
@@ -80,7 +80,7 @@ describe('E2E — REST API', () => {
 
   after(async () => {
     handle.wss.close();
-    handle.watcher.close();
+    await handle.watcher.close();
     await new Promise((r) => handle.server.close(r));
     process.env.HOME = ORIG_HOME;
     fs.rmSync(TEST_HOME, { recursive: true, force: true });
@@ -200,7 +200,7 @@ describe('E2E — REST API', () => {
   });
 });
 
-describe('E2E — WebSocket', () => {
+describe('E2E — WebSocket', { timeout: 30000 }, () => {
   let handle;
   const WS_PORT = TEST_PORT + 1;
 
@@ -212,7 +212,7 @@ describe('E2E — WebSocket', () => {
 
   after(async () => {
     handle.wss.close();
-    handle.watcher.close();
+    await handle.watcher.close();
     await new Promise((r) => handle.server.close(r));
   });
 
