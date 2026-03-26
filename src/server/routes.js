@@ -183,14 +183,30 @@ function registerRoutes(app, eventStore, dataDir) {
     if (!resolved.startsWith(home)) return res.status(403).json({ error: 'Forbidden' });
 
     const ok = (r) => r.error == null && r.status === 0;
-    const branch   = spawnSync('git', ['-C', resolved, 'branch', '--show-current'],        { encoding: 'utf-8', timeout: 3000 });
-    const repoName = spawnSync('git', ['-C', resolved, 'rev-parse', '--show-toplevel'],    { encoding: 'utf-8', timeout: 3000 });
-    const dirty    = spawnSync('git', ['-C', resolved, 'status', '--porcelain', '--short'], { encoding: 'utf-8', timeout: 3000 });
+    const str = (r) => ok(r) ? (r.stdout.trim() || null) : null;
+
+    const branch     = spawnSync('git', ['-C', resolved, 'branch', '--show-current'],                     { encoding: 'utf-8', timeout: 3000 });
+    const repoName   = spawnSync('git', ['-C', resolved, 'rev-parse', '--show-toplevel'],                 { encoding: 'utf-8', timeout: 3000 });
+    const dirty      = spawnSync('git', ['-C', resolved, 'status', '--porcelain', '--short'],             { encoding: 'utf-8', timeout: 3000 });
+    const userName   = spawnSync('git', ['-C', resolved, 'config', 'user.name'],                         { encoding: 'utf-8', timeout: 3000 });
+    const userEmail  = spawnSync('git', ['-C', resolved, 'config', 'user.email'],                        { encoding: 'utf-8', timeout: 3000 });
+    const remoteUrl  = spawnSync('git', ['-C', resolved, 'remote', 'get-url', 'origin'],                 { encoding: 'utf-8', timeout: 3000 });
+    const lastCommit = spawnSync('git', ['-C', resolved, 'log', '-1', '--format=%H\x1f%s\x1f%an\x1f%ar'], { encoding: 'utf-8', timeout: 3000 });
+
+    let commit = null;
+    if (ok(lastCommit) && lastCommit.stdout.trim()) {
+      const [hash, subject, author, relDate] = lastCommit.stdout.trim().split('\x1f');
+      commit = { hash: hash.slice(0, 7), subject, author, relDate };
+    }
 
     res.json({
-      branch:   ok(branch)   ? (branch.stdout.trim()   || null) : null,
-      repoName: ok(repoName) ? path.basename(repoName.stdout.trim()) : null,
-      dirty:    ok(dirty)    ? dirty.stdout.trim().split('\n').filter(Boolean).length : 0,
+      branch:     str(branch)   || null,
+      repoName:   ok(repoName)  ? path.basename(repoName.stdout.trim()) : null,
+      dirty:      ok(dirty)     ? dirty.stdout.trim().split('\n').filter(Boolean).length : 0,
+      userName:   str(userName),
+      userEmail:  str(userEmail),
+      remoteUrl:  str(remoteUrl),
+      commit,
     });
   });
 

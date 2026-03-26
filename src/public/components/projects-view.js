@@ -51,6 +51,43 @@ function renderGitBadge(el, data) {
   el.style.display = 'inline-flex';
 }
 
+function renderGitIntelligence(el, data) {
+  el.textContent = '';
+  var hasAny = data.userName || data.userEmail || data.remoteUrl || data.commit;
+  if (!hasAny) return;
+
+  el.style.cssText = 'border-top:1px solid var(--border);margin-top:10px;padding-top:10px';
+
+  var title = document.createElement('div');
+  title.style.cssText = 'font-size:10px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px';
+  title.textContent = 'Project Intelligence';
+  el.appendChild(title);
+
+  var rows = [];
+  if (data.remoteUrl)  rows.push({ label: 'Remote',  value: data.remoteUrl,  mono: true });
+  if (data.userName)   rows.push({ label: 'Git user', value: data.userName,  mono: false });
+  if (data.userEmail)  rows.push({ label: 'Git email', value: data.userEmail, mono: true });
+  if (data.commit)     rows.push({ label: 'Last commit', value: data.commit.hash + ' · ' + data.commit.subject + ' · ' + data.commit.relDate, mono: true });
+
+  for (var i = 0; i < rows.length; i++) {
+    var row = document.createElement('div');
+    row.style.cssText = 'display:flex;gap:8px;align-items:baseline;margin-bottom:4px;min-width:0';
+
+    var lbl = document.createElement('span');
+    lbl.style.cssText = 'font-size:11px;color:var(--text-muted);white-space:nowrap;flex-shrink:0;min-width:72px';
+    lbl.textContent = rows[i].label;
+
+    var val = document.createElement('span');
+    val.style.cssText = 'font-size:11px;color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;' + (rows[i].mono ? 'font-family:var(--font-mono)' : '');
+    val.title = rows[i].value;
+    val.textContent = rows[i].value;
+
+    row.appendChild(lbl);
+    row.appendChild(val);
+    el.appendChild(row);
+  }
+}
+
 class ProjectsView {
   constructor(dashboard) {
     this.dashboard = dashboard;
@@ -163,16 +200,22 @@ class ProjectsView {
     gitBadge.style.display = 'none';
     nameWrap.appendChild(gitBadge);
 
+    // Project Intelligence section — must be declared before cache check (used in both sync + async paths)
+    var intelSection = document.createElement('div');
+    intelSection.className = 'project-intel';
+
     var self = this;
     var cached = this._gitCache.get(project.root);
     if (cached) {
       renderGitBadge(gitBadge, cached);
+      renderGitIntelligence(intelSection, cached);
     } else {
       fetch('/api/git?cwd=' + encodeURIComponent(project.root))
         .then(function(r) { return r.json(); })
         .then(function(data) {
           self._gitCache.set(project.root, data);
           renderGitBadge(gitBadge, data);
+          renderGitIntelligence(intelSection, data);
         })
         .catch(function() {});
     }
@@ -209,6 +252,7 @@ class ProjectsView {
       stats.appendChild(statItem);
     }
     card.appendChild(stats);
+    card.appendChild(intelSection);
 
     // Top tools
     if (project.topTools && project.topTools.length > 0) {
