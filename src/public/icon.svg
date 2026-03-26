@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <!-- Board outline -->
+  <rect x="4" y="8" width="56" height="48" rx="6" stroke="#DA7756" stroke-width="2.5"/>
+  <!-- Neural net: 2 input → 3 hidden → 1 output -->
+  <circle cx="18" cy="26" r="4" stroke="#DA7756" stroke-width="2"/>
+  <circle cx="18" cy="42" r="4" stroke="#DA7756" stroke-width="2"/>
+  <circle cx="34" cy="20" r="4" stroke="#DA7756" stroke-width="2"/>
+  <circle cx="34" cy="34" r="4" stroke="#DA7756" stroke-width="2"/>
+  <circle cx="34" cy="48" r="4" stroke="#DA7756" stroke-width="2"/>
+  <circle cx="50" cy="34" r="4.5" fill="#DA7756" stroke="none"/>
+  <!-- Connections input→hidden -->
+  <line x1="22" y1="26" x2="30" y2="21" stroke="#DA7756" stroke-width="1.2" opacity="0.5"/>
+  <line x1="22" y1="26" x2="30" y2="34" stroke="#DA7756" stroke-width="1.2" opacity="0.5"/>
+  <line x1="22" y1="26" x2="30" y2="47" stroke="#DA7756" stroke-width="1.2" opacity="0.5"/>
+  <line x1="22" y1="42" x2="30" y2="21" stroke="#DA7756" stroke-width="1.2" opacity="0.5"/>
+  <line x1="22" y1="42" x2="30" y2="34" stroke="#DA7756" stroke-width="1.2" opacity="0.5"/>
+  <line x1="22" y1="42" x2="30" y2="47" stroke="#DA7756" stroke-width="1.2" opacity="0.5"/>
+  <!-- Connections hidden→output -->
+  <line x1="38" y1="21" x2="45" y2="34" stroke="#DA7756" stroke-width="1.5" opacity="0.7"/>
+  <line x1="38" y1="34" x2="45" y2="34" stroke="#DA7756" stroke-width="1.5" opacity="0.7"/>
+  <line x1="38" y1="47" x2="45" y2="34" stroke="#DA7756" stroke-width="1.5" opacity="0.7"/>
+</svg>

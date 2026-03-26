@@ -1,0 +1,39 @@
+{
+  "name": "llmboard",
+  "displayName": "LLMBoard",
+  "description": "Real-time monitoring for Claude Code — agents, tools, tokens, and commands",
+  "version": "1.0.0",
+  "publisher": "llmboard",
+  "engines": { "vscode": "^1.85.0" },
+  "categories": ["Other"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./src/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "llmboard.open",
+        "title": "LLMBoard: Open Dashboard"
+      },
+      {
+        "command": "llmboard.stop",
+        "title": "LLMBoard: Stop Server"
+      }
+    ],
+    "configuration": {
+      "title": "LLMBoard",
+      "properties": {
+        "llmboard.port": {
+          "type": "number",
+          "default": 3456,
+          "description": "Port for the LLMBoard server"
+        },
+        "llmboard.autoStart": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically start the server when VS Code opens"
+        }
+      }
+    }
+  },
+  "keywords": ["claude", "llm", "ai", "monitoring", "agents"]
+}

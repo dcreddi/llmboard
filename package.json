@@ -1,0 +1,43 @@
+{
+  "name": "llmboard",
+  "version": "1.0.0",
+  "description": "LLMBoard — real-time observability for Claude Code. Watch agents, tools, tokens, and security anomalies as they happen.",
+  "main": "src/server/index.js",
+  "bin": {
+    "llmboard": "./bin/cli.js"
+  },
+  "scripts": {
+    "start": "node src/server/index.js",
+    "setup": "node bin/cli.js setup",
+    "remove": "node bin/cli.js remove",
+    "test": "node --test test/**/*.test.js",
+    "postinstall": "node bin/cli.js setup --silent"
+  },
+  "keywords": [
+    "claude",
+    "claude-code",
+    "anthropic",
+    "ai",
+    "dashboard",
+    "monitoring",
+    "agent",
+    "llm",
+    "developer-tools",
+    "cli"
+  ],
+  "author": "",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/xcdharanee/llmboard"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "chokidar": "^4.0.0",
+    "express": "^4.21.0",
+    "open": "^10.1.0",
+    "ws": "^8.18.0"
+  }
+}

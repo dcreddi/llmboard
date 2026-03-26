@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LLMBoard</title>
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#DA7756">
+</head>
+<body>
+  <nav id="sidebar">
+    <div class="sidebar-header">
+      <div class="logo">
+        <!-- LLMBoard logo: neural network nodes on a board — LLM + dashboard -->
+        <svg class="logo-icon" viewBox="0 0 64 64" width="26" height="26" fill="none">
+          <!-- Board outline -->
+          <rect x="4" y="8" width="56" height="48" rx="6" stroke="#DA7756" stroke-width="2.5"/>
+          <!-- Neural net: 2 input nodes → 2 hidden → 1 output -->
+          <circle cx="18" cy="26" r="4" stroke="#DA7756" stroke-width="2"/>
+          <circle cx="18" cy="42" r="4" stroke="#DA7756" stroke-width="2"/>
+          <circle cx="34" cy="20" r="4" stroke="#DA7756" stroke-width="2"/>
+          <circle cx="34" cy="34" r="4" stroke="#DA7756" stroke-width="2"/>
+          <circle cx="34" cy="48" r="4" stroke="#DA7756" stroke-width="2"/>
+          <circle cx="50" cy="34" r="4.5" fill="#DA7756" stroke="none"/>
+          <!-- Connections input→hidden -->
+          <line x1="22" y1="26" x2="30" y2="21" stroke="#DA7756" stroke-width="1.2" opacity="0.5"/>
+          <line x1="22" y1="26" x2="30" y2="34" stroke="#DA7756" stroke-width="1.2" opacity="0.5"/>
+          <line x1="22" y1="26" x2="30" y2="47" stroke="#DA7756" stroke-width="1.2" opacity="0.5"/>
+          <line x1="22" y1="42" x2="30" y2="21" stroke="#DA7756" stroke-width="1.2" opacity="0.5"/>
+          <line x1="22" y1="42" x2="30" y2="34" stroke="#DA7756" stroke-width="1.2" opacity="0.5"/>
+          <line x1="22" y1="42" x2="30" y2="47" stroke="#DA7756" stroke-width="1.2" opacity="0.5"/>
+          <!-- Connections hidden→output -->
+          <line x1="38" y1="21" x2="45" y2="34" stroke="#DA7756" stroke-width="1.5" opacity="0.7"/>
+          <line x1="38" y1="34" x2="45" y2="34" stroke="#DA7756" stroke-width="1.5" opacity="0.7"/>
+          <line x1="38" y1="47" x2="45" y2="34" stroke="#DA7756" stroke-width="1.5" opacity="0.7"/>
+        </svg>
+        <span class="logo-text">LLMBoard</span>
+      </div>
+    </div>
+
+    <ul class="nav-list">
+      <!-- Sessions: terminal window + live dot — multiple live CLI sessions -->
+      <li class="nav-item active" data-view="sessions">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="2" y="3" width="20" height="16" rx="2"/>
+          <line x1="2" y1="7" x2="22" y2="7"/>
+          <polyline points="6 12 9 15 6 18"/>
+          <line x1="12" y1="18" x2="17" y2="18"/>
+          <circle cx="19" cy="5" r="1.5" fill="currentColor" stroke="none"/>
+        </svg>
+        <span>Sessions</span>
+      </li>
+      <!-- Projects: git branch — like Projects in Claude desktop -->
+      <li class="nav-item" data-view="projects">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="18" cy="18" r="3"/>
+          <circle cx="6" cy="6" r="3"/>
+          <path d="M6 9v1a3 3 0 0 0 3 3h6"/>
+          <circle cx="18" cy="6" r="3"/>
+          <line x1="18" y1="9" x2="18" y2="15"/>
+        </svg>
+        <span>Projects</span>
+      </li>
+      <!-- Agents: org chart — manager overseeing agents -->
+      <li class="nav-item" data-view="agents">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="9" y="2" width="6" height="5" rx="1"/>
+          <line x1="12" y1="7" x2="12" y2="11"/>
+          <line x1="5" y1="11" x2="19" y2="11"/>
+          <line x1="5"  y1="11" x2="5"  y2="14"/>
+          <line x1="12" y1="11" x2="12" y2="14"/>
+          <line x1="19" y1="11" x2="19" y2="14"/>
+          <rect x="2"  y="14" width="6" height="5" rx="1"/>
+          <rect x="9"  y="14" width="6" height="5" rx="1"/>
+          <rect x="16" y="14" width="6" height="5" rx="1"/>
+        </svg>
+        <span>Agents</span>
+      </li>
+      <!-- Alerts: shield + ! — security anomalies, high priority -->
+      <li class="nav-item" data-view="alerts">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          <line x1="12" y1="8" x2="12" y2="12"/>
+          <line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        <span>Alerts</span>
+      </li>
+      <!-- Command Center: terminal prompt — command log & rules -->
+      <li class="nav-item" data-view="commands">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="4 17 10 11 4 5"/>
+          <line x1="12" y1="19" x2="20" y2="19"/>
+        </svg>
+        <span>Commands</span>
+      </li>
+      <!-- Tools: hammer — tool call activity feed -->
+      <li class="nav-item" data-view="tools">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M15 12l-8.5 8.5a2.12 2.12 0 0 1-3-3L12 9"/>
+          <path d="M17.64 15L22 10.64"/>
+          <path d="M20.91 11.7l-1.25-1.25c-.6-.6-.93-1.4-.93-2.25v-.86L16.01 4.6a5.56 5.56 0 0 0-3.94-1.64H9l.92.82A6.18 6.18 0 0 1 12 8.4v1.56l2 2h2.47l2.26 1.91"/>
+        </svg>
+        <span>Tools</span>
+      </li>
+      <!-- Analytics: pulse line — token & cost charts -->
+      <li class="nav-item" data-view="analytics">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+        </svg>
+        <span>Analytics</span>
+      </li>
+      <!-- Network: connected nodes — outbound domains -->
+      <li class="nav-item" data-view="network">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="5" r="2"/>
+          <circle cx="5" cy="19" r="2"/>
+          <circle cx="19" cy="19" r="2"/>
+          <line x1="12" y1="7" x2="5" y2="17"/>
+          <line x1="12" y1="7" x2="19" y2="17"/>
+          <line x1="5" y1="19" x2="19" y2="19"/>
+        </svg>
+        <span>Network</span>
+      </li>
+      <!-- Settings: sliders — configuration controls -->
+      <li class="nav-item" data-view="extensions">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="4" y1="21" x2="4" y2="14"/>
+          <line x1="4" y1="10" x2="4" y2="3"/>
+          <line x1="12" y1="21" x2="12" y2="12"/>
+          <line x1="12" y1="8" x2="12" y2="3"/>
+          <line x1="20" y1="21" x2="20" y2="16"/>
+          <line x1="20" y1="12" x2="20" y2="3"/>
+          <line x1="1" y1="14" x2="7" y2="14"/>
+          <line x1="9" y1="8" x2="15" y2="8"/>
+          <line x1="17" y1="16" x2="23" y2="16"/>
+        </svg>
+        <span>Settings</span>
+      </li>
+    </ul>
+
+    <div class="sidebar-footer">
+      <div id="connection-status" class="status-badge disconnected">
+        <span class="status-dot"></span>
+        <span class="status-text">Connecting...</span>
+      </div>
+    </div>
+  </nav>
+
+  <main id="content">
+    <!-- Header bar -->
+    <header id="header">
+      <div class="header-left">
+        <h1 id="view-title">Live Sessions</h1>
+      </div>
+      <div class="header-right">
+        <div class="stat-pill" id="global-sessions">
+          <span class="stat-label">Sessions</span>
+          <span class="stat-value" id="active-session-count">0</span>
+        </div>
+        <div class="stat-pill" id="global-tokens">
+          <span class="stat-label">Tokens</span>
+          <span class="stat-value" id="total-token-count">0</span>
+        </div>
+        <div class="stat-pill stat-pill-link" id="global-domains" data-nav="network" title="Go to Network & Domains">
+          <span class="stat-label">Ext. Domains</span>
+          <span class="stat-value" id="external-domain-count">0</span>
+        </div>
+        <div class="stat-pill stat-pill-link" id="global-alerts" data-nav="alerts" title="Go to Anomaly Alerts">
+          <span class="stat-label">Alerts</span>
+          <span class="stat-value" id="alert-count">0</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Views -->
+    <section id="view-sessions" class="view active"></section>
+    <section id="view-agents" class="view"></section>
+    <section id="view-tools" class="view"></section>
+    <section id="view-commands" class="view"></section>
+    <section id="view-analytics" class="view"></section>
+    <section id="view-network" class="view"></section>
+    <section id="view-alerts" class="view"></section>
+    <section id="view-projects" class="view"></section>
+    <section id="view-extensions" class="view"></section>
+
+    <!-- Empty state -->
+    <div id="empty-state" class="empty-state hidden">
+      <div class="empty-icon">
+        <svg viewBox="0 0 24 24" width="64" height="64" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.4">
+          <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+          <line x1="8" y1="21" x2="16" y2="21"/>
+          <line x1="12" y1="17" x2="12" y2="21"/>
+        </svg>
+      </div>
+      <h2>No Active Sessions</h2>
+      <p>Start using any LLM tool in your terminal and events will appear here in real-time.</p>
+      <div class="empty-help">
+        <p>If you haven't set up hooks yet:</p>
+        <code>llmboard setup</code>
+        <p class="empty-subtext">Need help? Run <code>llmboard doctor</code> to diagnose issues.</p>
+      </div>
+    </div>
+  </main>
+
+  <script src="/dashboard.js"></script>
+  <script src="/components/charts.js"></script>
+  <script src="/components/sessions-view.js"></script>
+  <script src="/components/agents-view.js"></script>
+  <script src="/components/tools-view.js"></script>
+  <script src="/components/command-center-view.js"></script>
+  <script src="/components/analytics-view.js"></script>
+  <script src="/components/network-view.js"></script>
+  <script src="/components/anomalies-view.js"></script>
+  <script src="/components/projects-view.js"></script>
+  <script src="/components/extensions-view.js"></script>
+  <script>
+    // Initialize the dashboard
+    window.addEventListener('DOMContentLoaded', () => {
+      window.dashboard = new Dashboard();
+      // Navigatable stat pills
+      document.querySelectorAll('.stat-pill-link[data-nav]').forEach(pill => {
+        pill.addEventListener('click', () => window.dashboard.navigate(pill.dataset.nav));
+      });
+    });
+
+    // PWA service worker registration
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(() => {});
+    }
+  </script>
+</body>
+</html>

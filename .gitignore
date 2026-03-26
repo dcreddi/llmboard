@@ -1,0 +1,10 @@
+node_modules/
+.claude-dashboard/
+*.log
+.DS_Store
+dist/
+coverage/
+.env
+.env.*
+*.local.json
+.claude/settings.local.json
