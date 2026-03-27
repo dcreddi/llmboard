@@ -1,17 +1,17 @@
 {
   "name": "llmboard",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "LLMBoard — real-time observability for Claude Code. Watch agents, tools, tokens, and security anomalies as they happen.",
   "main": "src/server/index.js",
   "bin": {
-    "llmboard": "./bin/cli.js"
+    "llmboard": "bin/cli.js"
   },
   "scripts": {
     "start": "node src/server/index.js",
     "setup": "node bin/cli.js setup",
     "remove": "node bin/cli.js remove",
     "test": "node --test test/*.test.js",
-    "postinstall": "node bin/cli.js setup --silent"
+    "postinstall": "node -e \"if(!process.env.CI && !process.env.LLMBOARD_SKIP_SETUP) require('child_process').spawnSync(process.execPath,['bin/cli.js','setup','--silent'],{stdio:'inherit'});\""
   },
   "keywords": [
     "claude",
@@ -25,11 +25,22 @@
     "developer-tools",
     "cli"
   ],
-  "author": "",
+  "author": "DCReddi Inc <katuru@dcreddi.com>",
+  "files": [
+    "bin",
+    "src",
+    "hooks",
+    "README.md",
+    "LICENSE"
+  ],
   "license": "MIT",
+  "homepage": "https://github.com/dcreddi/llmboard#readme",
+  "bugs": {
+    "url": "https://github.com/dcreddi/llmboard/issues"
+  },
   "repository": {
     "type": "git",
-    "url": "https://github.com/dcreddi/llmboard"
+    "url": "git+https://github.com/dcreddi/llmboard.git"
   },
   "engines": {
     "node": ">=18"

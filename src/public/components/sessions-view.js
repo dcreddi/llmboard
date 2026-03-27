@@ -71,7 +71,11 @@ class SessionsView {
     badges.appendChild(badge);
 
     if (session.model) {
-      var modelNames = { 'opus-4': 'Opus', 'sonnet-4': 'Sonnet', 'haiku-3.5': 'Haiku' };
+      var modelNames = {
+        'opus-4': 'Opus 4', 'opus-4-5': 'Opus 4.5', 'opus-4-6': 'Opus 4.6',
+        'sonnet-4': 'Sonnet 4', 'sonnet-4-5': 'Sonnet 4.5', 'sonnet-4-6': 'Sonnet 4.6',
+        'haiku-3.5': 'Haiku 3.5', 'haiku-4': 'Haiku 4', 'haiku-4-5': 'Haiku 4.5',
+      };
       var mlBadge = document.createElement('span');
       mlBadge.style.cssText = 'font-size:11px;padding:2px 8px;border-radius:4px;background:var(--bg-tertiary);color:var(--accent-purple);font-family:var(--font-mono);white-space:nowrap;flex-shrink:0';
       mlBadge.textContent = modelNames[session.model] || session.model;

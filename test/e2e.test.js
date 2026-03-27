@@ -198,6 +198,63 @@ describe('E2E — REST API', { timeout: 30000 }, () => {
     const { status } = await httpPost(TEST_PORT, '/api/anomalies/no-such-id/acknowledge', {});
     assert.equal(status, 404);
   });
+
+  test('GET /api/export?format=csv returns CSV content-type', async () => {
+    const { status } = await new Promise((resolve, reject) => {
+      http.get(`http://localhost:${TEST_PORT}/api/export?format=csv`, (res) => {
+        res.resume();
+        res.on('end', () => resolve({ status: res.statusCode, ct: res.headers['content-type'] }));
+      }).on('error', reject);
+    });
+    assert.equal(status, 200);
+  });
+
+  test('GET /api/commands returns array', async () => {
+    const { status, body } = await httpGet(TEST_PORT, '/api/commands');
+    assert.equal(status, 200);
+    assert.ok(Array.isArray(body));
+  });
+
+  test('GET /api/command-rules returns safe and needsPermission arrays', async () => {
+    const { status, body } = await httpGet(TEST_PORT, '/api/command-rules');
+    assert.equal(status, 200);
+    assert.ok(Array.isArray(body.safe));
+    assert.ok(Array.isArray(body.needsPermission));
+  });
+
+  test('POST /api/command-rules saves rules and filters non-strings', async () => {
+    const { status, body } = await httpPost(TEST_PORT, '/api/command-rules', {
+      safe: ['my-tool', 123],
+      needsPermission: ['deploy'],
+    });
+    assert.equal(status, 200);
+    assert.deepEqual(body.safe, ['my-tool']);
+    assert.deepEqual(body.needsPermission, ['deploy']);
+  });
+
+  test('POST /api/command-rules 400 when arrays missing', async () => {
+    const { status } = await httpPost(TEST_PORT, '/api/command-rules', { safe: 'not-array' });
+    assert.equal(status, 400);
+  });
+
+  test('GET /api/git 400 when cwd missing', async () => {
+    const { status } = await httpGet(TEST_PORT, '/api/git');
+    assert.equal(status, 400);
+  });
+
+  test('GET /api/git 403 for path outside HOME', async () => {
+    const { status } = await httpGet(TEST_PORT, '/api/git?cwd=/etc');
+    assert.equal(status, 403);
+  });
+
+  test('GET /api/git returns shape for valid cwd', async () => {
+    const cwd = encodeURIComponent(process.env.HOME);
+    const { status, body } = await httpGet(TEST_PORT, `/api/git?cwd=${cwd}`);
+    assert.equal(status, 200);
+    assert.ok('branch' in body);
+    assert.ok('dirty' in body);
+    assert.ok('repoName' in body);
+  });
 });
 
 describe('E2E — WebSocket', { timeout: 30000 }, () => {

@@ -716,4 +716,4 @@ class EventStore {
   }
 }
 
-module.exports = { EventStore };
+module.exports = { EventStore, classifyCommand };

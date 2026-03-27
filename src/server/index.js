@@ -61,6 +61,30 @@ async function startServer(options = {}) {
   }
 
   const app = express();
+
+  // Security headers
+  app.use((req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+    res.setHeader('Content-Security-Policy',
+      "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; " +
+      "img-src 'self' data:; connect-src 'self' ws: wss:; font-src 'self'");
+    next();
+  });
+
+  // Simple in-memory rate limiter: max 120 requests/min per IP on /api/ routes
+  const _rateBuckets = new Map();
+  app.use('/api/', (req, res, next) => {
+    const ip = req.socket.remoteAddress || 'unknown';
+    const now = Date.now();
+    const bucket = _rateBuckets.get(ip) || { count: 0, start: now };
+    if (now - bucket.start > 60000) { bucket.count = 0; bucket.start = now; }
+    bucket.count++;
+    _rateBuckets.set(ip, bucket);
+    if (bucket.count > 120) return res.status(429).json({ error: 'Too many requests' });
+    next();
+  });
+
   app.use(express.json({ limit: '64kb' }));
   app.use(express.static(path.join(__dirname, '../public')));
 
@@ -217,5 +241,11 @@ async function startServer(options = {}) {
 module.exports = { startServer, loadConfig };
 
 if (require.main === module) {
+  process.on('uncaughtException', (err) => {
+    console.error('Uncaught exception:', err.message);
+  });
+  process.on('unhandledRejection', (reason) => {
+    console.error('Unhandled rejection:', reason);
+  });
   startServer().catch(console.error);
 }

@@ -179,8 +179,13 @@ function registerRoutes(app, eventStore, dataDir) {
     const cwd = req.query.cwd;
     if (!cwd) return res.status(400).json({ error: 'cwd required' });
     const home = process.env.HOME || '/';
-    const resolved = path.resolve(cwd);
-    if (!resolved.startsWith(home)) return res.status(403).json({ error: 'Forbidden' });
+    let resolved;
+    try {
+      resolved = fs.realpathSync(path.resolve(cwd));
+    } catch {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+    if (!resolved.startsWith(home + path.sep) && resolved !== home) return res.status(403).json({ error: 'Forbidden' });
 
     const ok = (r) => r.error == null && r.status === 0;
     const str = (r) => ok(r) ? (r.stdout.trim() || null) : null;

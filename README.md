@@ -65,7 +65,7 @@ Click the **Ext. Domains** or **Alerts** counters in the header to jump directly
 npm install -g llmboard
 ```
 
-`postinstall` automatically runs `llmboard setup --silent` — installs Claude Code hooks and creates `~/.llmboard/`.
+`postinstall` automatically runs `llmboard setup --silent` — installs Claude Code hooks and creates `~/.llmboard/`. Skipped automatically in CI environments or when `LLMBOARD_SKIP_SETUP=1` is set.
 
 ### Manual setup
 
@@ -111,8 +111,8 @@ The `vscode-extension/` directory contains a companion extension that embeds the
 
 ```bash
 cd vscode-extension
-npm install -g @vscode/vsce
-vsce package
+npm install
+npm run package
 code --install-extension llmboard-1.0.0.vsix
 ```
 
@@ -364,6 +364,18 @@ There's no allowlist UI yet — all external domains appear in **Network & Domai
 
 **Q: Why does Project Intelligence show the wrong git identity?**
 LLMBoard reads the effective `git config user.name` and `user.email` for each repo (local config takes priority over global). If a project shows unexpected credentials, check `git config --list` in that directory.
+
+**Q: How do I skip the automatic setup on install?**
+Set the environment variable before installing:
+
+```bash
+LLMBOARD_SKIP_SETUP=1 npm install -g llmboard
+```
+
+Then run `llmboard setup` manually when ready. Setup is also skipped automatically in CI environments (`CI=true`).
+
+**Q: I'm getting 429 Too Many Requests from the API.**
+The server rate-limits API calls to 120 requests/minute per client to prevent runaway scripts from overwhelming it. If you're hitting this legitimately (e.g. a custom integration), add a small delay between calls or batch your requests.
 
 **Q: Can I use LLMBoard without installing it globally?**
 Yes:
