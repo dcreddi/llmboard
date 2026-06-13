@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const http = require('http');
 const express = require('express');
+const rateLimit = require('express-rate-limit');
 const { WebSocketServer } = require('ws');
 const chokidar = require('chokidar');
 const { FileTailer } = require('./file-tailer');
@@ -86,18 +87,12 @@ async function startServer(options = {}) {
     next();
   });
 
-  // Simple in-memory rate limiter: max 120 requests/min per IP on /api/ routes
-  const _rateBuckets = new Map();
-  app.use('/api/', (req, res, next) => {
-    const ip = req.socket.remoteAddress || 'unknown';
-    const now = Date.now();
-    const bucket = _rateBuckets.get(ip) || { count: 0, start: now };
-    if (now - bucket.start > 60000) { bucket.count = 0; bucket.start = now; }
-    bucket.count++;
-    _rateBuckets.set(ip, bucket);
-    if (bucket.count > 120) return res.status(429).json({ error: 'Too many requests' });
-    next();
-  });
+  // Rate limiting (per IP). General limiter is generous enough for a page load's
+  // static assets; the /api/ limiter is stricter since some endpoints spawn git
+  // subprocesses. Matters most under `llmboard start --share` (public tunnel).
+  const limiterOpts = { windowMs: 60_000, standardHeaders: 'draft-7', legacyHeaders: false, message: { error: 'Too many requests' } };
+  app.use(rateLimit({ ...limiterOpts, limit: 1000 }));
+  app.use('/api/', rateLimit({ ...limiterOpts, limit: 240 }));
 
   app.use(express.json({ limit: '64kb' }));
   app.use(express.static(path.join(__dirname, '../public')));
