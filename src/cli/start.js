@@ -72,9 +72,11 @@ async function run(args = []) {
   if (!noOpen) {
     try {
       const open = (await import('open')).default;
-      await open(`http://localhost:${result.port}`);
+      // 127.0.0.1, not localhost: the server binds IPv4 loopback, and some setups
+      // resolve localhost to IPv6 (::1) only.
+      await open(`http://127.0.0.1:${result.port}`);
     } catch {
-      console.log(`Open http://localhost:${result.port} in your browser`);
+      console.log(`Open http://127.0.0.1:${result.port} in your browser`);
     }
   }
 
