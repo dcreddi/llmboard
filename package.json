@@ -11,6 +11,7 @@
     "setup": "node bin/cli.js setup",
     "remove": "node bin/cli.js remove",
     "test": "node --test test/*.test.js",
+    "verify": "node scripts/verify-manifests.js",
     "preuninstall": "node -e \"try{require('./src/cli/remove').run(['--silent'])}catch(e){}\""
   },
   "keywords": [

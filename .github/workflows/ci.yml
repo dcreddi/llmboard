@@ -64,3 +64,24 @@ jobs:
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v4
+
+  verify:
+    name: Verify manifests & package
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Check version is in sync across npm / plugin / marketplace / extension
+        run: node scripts/verify-manifests.js
+
+      - name: Package VS Code extension (smoke test)
+        run: |
+          cd vscode-extension
+          npm ci
+          npx --yes @vscode/vsce package -o /tmp/llmboard-ext.vsix
