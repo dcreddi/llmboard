@@ -1,11 +1,14 @@
 {
   "name": "llmboard",
   "displayName": "LLMBoard",
-  "description": "Real-time monitoring for Claude Code — agents, tools, tokens, and commands",
-  "version": "1.0.0",
+  "description": "Real-time monitoring for Claude Code — agents, tools, tokens, cost, and security anomalies. Live status bar + one-click dashboard.",
+  "version": "1.1.0",
   "publisher": "llmboard",
+  "license": "MIT",
+  "homepage": "https://github.com/dcreddi/llmboard#readme",
+  "bugs": { "url": "https://github.com/dcreddi/llmboard/issues" },
   "engines": { "vscode": "^1.85.0" },
-  "categories": ["Other"],
+  "categories": ["Visualization", "Other"],
   "activationEvents": ["onStartupFinished"],
   "main": "./src/extension.js",
   "contributes": {

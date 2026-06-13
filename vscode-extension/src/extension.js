@@ -5,14 +5,13 @@ const path = require('path');
 const http = require('http');
 
 let serverProcess = null;
-let panel = null;
 let statusBarItem = null;
+let pollTimer = null;
 
 function activate(context) {
   statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
   statusBarItem.command = 'llmboard.open';
-  statusBarItem.text = '$(circuit-board) LLMBoard';
-  statusBarItem.tooltip = 'Open LLMBoard Dashboard';
+  setStatus('idle');
   statusBarItem.show();
   context.subscriptions.push(statusBarItem);
 
@@ -21,8 +20,8 @@ function activate(context) {
     vscode.commands.registerCommand('llmboard.stop', stopServer),
   );
 
-  const config = vscode.workspace.getConfiguration('llmboard');
-  if (config.get('autoStart')) {
+  startPolling();
+  if (vscode.workspace.getConfiguration('llmboard').get('autoStart')) {
     startServerIfNeeded(context);
   }
 }
@@ -31,132 +30,107 @@ function getPort() {
   return vscode.workspace.getConfiguration('llmboard').get('port') || 3456;
 }
 
-function isServerRunning(port) {
+// Fetch JSON from the local server. This runs in the extension HOST (Node), which
+// is NOT subject to CORS or X-Frame-Options — unlike a webview/browser context —
+// so we can read live stats directly to drive the status bar.
+function getJson(port, urlPath) {
   return new Promise((resolve) => {
-    const req = http.get(`http://localhost:${port}/api/health`, (res) => {
-      resolve(res.statusCode === 200);
+    const req = http.get(`http://127.0.0.1:${port}${urlPath}`, (res) => {
+      if (res.statusCode !== 200) { res.resume(); return resolve(null); }
+      let body = '';
+      res.on('data', (c) => { body += c; });
+      res.on('end', () => { try { resolve(JSON.parse(body)); } catch { resolve(null); } });
     });
-    req.on('error', () => resolve(false));
-    req.setTimeout(1000, () => { req.destroy(); resolve(false); });
+    req.on('error', () => resolve(null));
+    req.setTimeout(1000, () => { req.destroy(); resolve(null); });
   });
+}
+
+async function isServerRunning(port) {
+  return (await getJson(port, '/api/health')) != null;
+}
+
+function fmt(n) {
+  if (!n) return '0';
+  if (n < 1000) return String(n);
+  if (n < 1e6) return (n / 1000).toFixed(1) + 'K';
+  return (n / 1e6).toFixed(2) + 'M';
+}
+
+function startPolling() {
+  const tick = async () => {
+    const port = getPort();
+    const stats = await getJson(port, '/api/stats');
+    if (stats) {
+      const tokens = (stats.totalTokens && (stats.totalTokens.input + stats.totalTokens.output)) || 0;
+      setStatus('connected', { tokens, active: stats.activeSessions || 0, anomalies: stats.anomalyCount || 0, port });
+    } else {
+      setStatus(serverProcess ? 'starting' : 'idle');
+    }
+  };
+  tick();
+  pollTimer = setInterval(tick, 5000);
+}
+
+function setStatus(state, info = {}) {
+  if (!statusBarItem) return;
+  if (state === 'connected') {
+    const alert = info.anomalies > 0 ? ` $(warning)${info.anomalies}` : '';
+    statusBarItem.text = `$(circuit-board) ${fmt(info.tokens)} tok · ${info.active} active${alert}`;
+    statusBarItem.tooltip = `LLMBoard on :${info.port} — ${fmt(info.tokens)} tokens, ${info.active} active session(s)`
+      + (info.anomalies ? `, ${info.anomalies} unacknowledged alert(s)` : '')
+      + '. Click to open the dashboard in your browser.';
+  } else if (state === 'starting') {
+    statusBarItem.text = '$(sync~spin) LLMBoard';
+    statusBarItem.tooltip = 'LLMBoard starting…';
+  } else {
+    statusBarItem.text = '$(circuit-board) LLMBoard';
+    statusBarItem.tooltip = 'Click to start LLMBoard and open the dashboard';
+  }
 }
 
 async function startServerIfNeeded(context) {
   const port = getPort();
-  const running = await isServerRunning(port);
-  if (running) {
-    updateStatus('connected', port);
-    return port;
-  }
+  if (await isServerRunning(port)) return port;
 
-  // Find the llmboard server entry point relative to extension
-  // Works when extension is installed alongside the llmboard package
+  // Resolve the llmboard server: prefer the installed npm package, else a sibling checkout.
   let serverPath;
   try {
     serverPath = require.resolve('llmboard/src/server/index');
   } catch {
-    // Fallback: look for server relative to extension root
     serverPath = path.join(context.extensionPath, '..', 'src', 'server', 'index.js');
   }
 
-  updateStatus('starting', port);
-
+  setStatus('starting');
   const { fork } = require('child_process');
-  serverProcess = fork(serverPath, [], {
-    env: { ...process.env },
-    silent: true,
-  });
-
-  serverProcess.on('exit', () => updateStatus('disconnected', port));
-
-  // Wait up to 5s for server to be ready
-  for (let i = 0; i < 10; i++) {
-    await new Promise((r) => setTimeout(r, 500));
-    if (await isServerRunning(port)) {
-      updateStatus('connected', port);
-      return port;
-    }
+  try {
+    serverProcess = fork(serverPath, [], { env: { ...process.env }, silent: true });
+  } catch {
+    return null;
   }
+  serverProcess.on('exit', () => { serverProcess = null; });
 
-  updateStatus('error', port);
+  for (let i = 0; i < 12; i++) {
+    await new Promise((r) => setTimeout(r, 500));
+    if (await isServerRunning(port)) return port;
+  }
   return null;
-}
-
-function updateStatus(state, port) {
-  const icons = { connected: '$(circuit-board)', starting: '$(sync~spin)', disconnected: '$(x)', error: '$(warning)' };
-  statusBarItem.text = `${icons[state] || '$(circuit-board)'} LLMBoard`;
-  statusBarItem.tooltip = state === 'connected'
-    ? `LLMBoard running on port ${port} — click to open`
-    : `LLMBoard ${state}`;
 }
 
 async function openDashboard(context) {
   const port = await startServerIfNeeded(context);
   if (!port) {
-    vscode.window.showErrorMessage('LLMBoard: Failed to start server. Is llmboard installed?');
+    const pick = await vscode.window.showErrorMessage(
+      'LLMBoard: could not start the server. Install it first: npm i -g llmboard',
+      'Copy install command'
+    );
+    if (pick) await vscode.env.clipboard.writeText('npm i -g llmboard');
     return;
   }
-
-  if (panel) {
-    panel.reveal();
-    return;
-  }
-
-  panel = vscode.window.createWebviewPanel(
-    'llmboard',
-    'LLMBoard',
-    vscode.ViewColumn.Two,
-    {
-      enableScripts: true,
-      retainContextWhenHidden: true,
-      localResourceRoots: [],
-    }
-  );
-
-  panel.webview.html = getWebviewHtml(port);
-  panel.onDidDispose(() => { panel = null; });
-}
-
-function getWebviewHtml(port) {
-  // VS Code WebView can't directly load localhost — use iframe via message bridge
-  // We redirect through a simple proxy HTML that loads the dashboard in an iframe
-  return `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { background: #1C1917; }
-    iframe { width: 100vw; height: 100vh; border: none; }
-    #loading { display: flex; align-items: center; justify-content: center;
-      height: 100vh; color: #A89E98; font-family: system-ui; font-size: 14px; flex-direction: column; gap: 12px; }
-    .spinner { width: 24px; height: 24px; border: 2px solid #3D3935;
-      border-top-color: #DA7756; border-radius: 50%; animation: spin 0.8s linear infinite; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-  </style>
-</head>
-<body>
-  <div id="loading">
-    <div class="spinner"></div>
-    <span>Connecting to LLMBoard...</span>
-  </div>
-  <script>
-    // Poll until the server is ready, then load the iframe
-    const port = ${port};
-    function tryLoad() {
-      fetch('http://localhost:' + port + '/api/health')
-        .then(() => {
-          document.getElementById('loading').remove();
-          const iframe = document.createElement('iframe');
-          iframe.src = 'http://localhost:' + port;
-          document.body.appendChild(iframe);
-        })
-        .catch(() => setTimeout(tryLoad, 800));
-    }
-    tryLoad();
-  </script>
-</body>
-</html>`;
+  // Open in the real browser. A localhost dashboard can't be embedded in a VS Code
+  // webview (X-Frame-Options + cross-origin fetch block it); the browser handles
+  // localhost natively and the server allows the loopback Host.
+  await vscode.env.openExternal(vscode.Uri.parse(`http://127.0.0.1:${port}`));
 }
 
 function stopServer() {
@@ -164,10 +138,11 @@ function stopServer() {
     serverProcess.kill();
     serverProcess = null;
   }
-  updateStatus('disconnected', getPort());
+  setStatus('idle');
 }
 
 function deactivate() {
+  if (pollTimer) clearInterval(pollTimer);
   stopServer();
 }
 
