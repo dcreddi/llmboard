@@ -56,27 +56,42 @@ Click the **Ext. Domains** or **Alerts** counters in the header to jump directly
 ## Installation
 
 ### Requirements
-- Node.js 18+
-- `jq` (recommended for hook enrichment — `brew install jq`)
+- Node.js 18+ (cross-platform — macOS, Linux, Windows)
 
-### Install globally
+> `jq` is optional and only used by the legacy shell hook; the default hook is a zero-dependency Node script.
+
+### Option A — Claude Code plugin (recommended)
+
+Installs the event hooks automatically **without modifying `~/.claude/settings.json`**, and works the same on every platform. In Claude Code:
+
+```text
+/plugin marketplace add dcreddi/llmboard
+/plugin install llmboard@llmboard
+```
+
+Then launch the dashboard any time with:
+
+```text
+/llmboard:launch-dashboard
+```
+
+(or run `npx llmboard` in a terminal). The plugin captures events to `~/.llmboard/`; the dashboard reads from there.
+
+> Use **either** the plugin **or** `llmboard setup` (Option B) — not both, or events are logged twice.
+
+### Option B — npm package
 
 ```bash
 npm install -g llmboard
-```
-
-`postinstall` automatically runs `llmboard setup --silent` — installs Claude Code hooks and creates `~/.llmboard/`. Skipped automatically in CI environments or when `LLMBOARD_SKIP_SETUP=1` is set.
-
-### Manual setup
-
-```bash
 llmboard setup
 ```
 
-This will:
-1. Create `~/.llmboard/` data directory and default config
-2. Install event hooks into `~/.claude/settings.json`
-3. Install a background auto-start service (launchd / systemd / Task Scheduler)
+`llmboard setup` is explicit (no install-time side effects). It will:
+1. Create the `~/.llmboard/` data directory and default config
+2. Register event hooks in `~/.claude/settings.json` (idempotent — safe to re-run)
+3. Offer to install a background auto-start service (launchd / systemd / Task Scheduler)
+
+Run `npx llmboard` (no install) to start the dashboard, or `llmboard` once installed globally. Uninstall cleanly with `llmboard remove` (add `--purge` to also delete `~/.llmboard/` data).
 
 ---
 
