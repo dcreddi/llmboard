@@ -33,7 +33,9 @@ function makeEvent(overrides = {}) {
 
 function httpGet(port, urlPath) {
   return new Promise((resolve, reject) => {
-    http.get(`http://localhost:${port}${urlPath}`, (res) => {
+    // Use 127.0.0.1, not localhost: the server binds IPv4 loopback, and on Node 18
+    // localhost resolves to ::1 first with no IPv4 fallback (autoSelectFamily off).
+    http.get(`http://127.0.0.1:${port}${urlPath}`, (res) => {
       let body = '';
       res.on('data', (c) => { body += c; });
       res.on('end', () => {
@@ -48,7 +50,7 @@ function httpPost(port, urlPath, data) {
   return new Promise((resolve, reject) => {
     const payload = JSON.stringify(data);
     const req = http.request({
-      hostname: 'localhost', port, path: urlPath,
+      hostname: '127.0.0.1', port, path: urlPath,
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) },
     }, (res) => {
@@ -201,7 +203,7 @@ describe('E2E — REST API', { timeout: 30000 }, () => {
 
   test('GET /api/export?format=csv returns CSV content-type', async () => {
     const { status } = await new Promise((resolve, reject) => {
-      http.get(`http://localhost:${TEST_PORT}/api/export?format=csv`, (res) => {
+      http.get(`http://127.0.0.1:${TEST_PORT}/api/export?format=csv`, (res) => {
         res.resume();
         res.on('end', () => resolve({ status: res.statusCode, ct: res.headers['content-type'] }));
       }).on('error', reject);
@@ -274,7 +276,7 @@ describe('E2E — WebSocket', { timeout: 30000 }, () => {
   });
 
   test('receives init message with required fields', (t, done) => {
-    const ws = new WebSocket(`ws://localhost:${WS_PORT}/ws`);
+    const ws = new WebSocket(`ws://127.0.0.1:${WS_PORT}/ws`);
     ws.once('message', (data) => {
       const msg = JSON.parse(data.toString());
       assert.equal(msg.type, 'init');
@@ -291,7 +293,7 @@ describe('E2E — WebSocket', { timeout: 30000 }, () => {
   });
 
   test('receives events broadcast after file append', (t, done) => {
-    const ws = new WebSocket(`ws://localhost:${WS_PORT}/ws`);
+    const ws = new WebSocket(`ws://127.0.0.1:${WS_PORT}/ws`);
     let initDone = false;
 
     ws.on('message', (data) => {

@@ -263,9 +263,9 @@ async function startServer(options = {}) {
           `Port ${preferredPort} in use, using ${port} instead`
         );
       }
-      console.log(`Claude Dashboard running at http://localhost:${port}`);
+      console.log(`Claude Dashboard running at http://127.0.0.1:${port}`);
       console.log(`Watching: ${EVENTS_FILE}`);
-      console.log(`WebSocket: ws://localhost:${port}/ws`);
+      console.log(`WebSocket: ws://127.0.0.1:${port}/ws`);
       console.log('\nPress Ctrl+C to stop\n');
       resolve({ server, port, wss, watcher, eventStore });
     });
