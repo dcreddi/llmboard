@@ -2,9 +2,10 @@
 
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 const { execFileSync } = require('child_process');
 
-const CONFIG_FILE = path.join(process.env.HOME, '.llmboard', 'config.json');
+const CONFIG_FILE = path.join(os.homedir(), '.llmboard', 'config.json');
 
 function loadConfig() {
   try {

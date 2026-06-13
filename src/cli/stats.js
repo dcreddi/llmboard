@@ -2,10 +2,11 @@
 
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 const { CostEstimator } = require('../server/cost-estimator');
 
 function run(args = []) {
-  const DATA_DIR = path.join(process.env.HOME, '.llmboard');
+  const DATA_DIR = path.join(os.homedir(), '.llmboard');
   const EVENTS_FILE = path.join(DATA_DIR, 'events.jsonl');
 
   if (!fs.existsSync(EVENTS_FILE)) {

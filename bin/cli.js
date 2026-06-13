@@ -4,6 +4,7 @@
 
 const command = process.argv[2];
 const args = process.argv.slice(3);
+const allArgs = process.argv.slice(2);
 
 const commands = {
   setup: '../src/cli/setup',
@@ -54,12 +55,12 @@ function showVersion() {
   console.log(`llmboard v${pkg.version}`);
 }
 
-if (args.includes('--help') || args.includes('-h') || command === 'help') {
+if (allArgs.includes('--help') || allArgs.includes('-h') || command === 'help') {
   showHelp();
   process.exit(0);
 }
 
-if (args.includes('--version') || args.includes('-v') || command === 'version') {
+if (allArgs.includes('--version') || allArgs.includes('-v') || command === 'version') {
   showVersion();
   process.exit(0);
 }

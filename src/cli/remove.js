@@ -2,10 +2,14 @@
 
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 
-const SETTINGS_PATH = path.join(process.env.HOME, '.claude', 'settings.json');
-const DATA_DIR = path.join(process.env.HOME, '.llmboard');
-const DASHBOARD_MARKER = 'llmboard';
+const SETTINGS_PATH = path.join(os.homedir(), '.claude', 'settings.json');
+const DATA_DIR = path.join(os.homedir(), '.llmboard');
+// Match our own hook by the script filename, which is identical regardless of where
+// the package is installed (npm global, local clone, relocated). Matching the brand
+// string "llmboard" silently missed local-clone installs and appended duplicates.
+const DASHBOARD_MARKER = 'event-logger';
 
 function isDashboardHook(entry) {
   return (
@@ -18,10 +22,18 @@ function isDashboardHook(entry) {
 }
 
 function run(args = []) {
-  console.log('Claude Dashboard — Hook Removal\n');
+  const silent = args.includes('--silent');
+  const purge = args.includes('--purge');
+  const log = silent ? () => {} : (...a) => console.log(...a);
+
+  log('Claude Dashboard — Hook Removal\n');
+
+  // Best-effort: also remove the auto-start service so it stops launching on login.
+  try { require('./service').run(['uninstall']); } catch { /* not installed / unsupported */ }
 
   if (!fs.existsSync(SETTINGS_PATH)) {
-    console.log('No ~/.claude/settings.json found. Nothing to remove.');
+    log('No ~/.claude/settings.json found. Nothing to remove.');
+    if (purge) purgeData(log);
     return;
   }
 
@@ -31,11 +43,13 @@ function run(args = []) {
   } catch (e) {
     console.error('ERROR: ~/.claude/settings.json is not valid JSON.');
     console.error(`Parse error: ${e.message}`);
+    if (silent) return; // preuninstall must not abort the npm lifecycle
     process.exit(1);
   }
 
   if (!settings.hooks) {
-    console.log('No hooks configured. Nothing to remove.');
+    log('No hooks configured. Nothing to remove.');
+    if (purge) purgeData(log);
     return;
   }
 
@@ -50,7 +64,7 @@ function run(args = []) {
     const removed = before - settings.hooks[event].length;
 
     if (removed > 0) {
-      console.log(`  Removed ${removed} dashboard hook(s) from ${event}`);
+      log(`  Removed ${removed} dashboard hook(s) from ${event}`);
       removedCount += removed;
     }
 
@@ -64,21 +78,21 @@ function run(args = []) {
   }
 
   try {
-    fs.writeFileSync(
-      SETTINGS_PATH,
-      JSON.stringify(settings, null, 2) + '\n',
-      'utf-8'
-    );
+    // Atomic write: a crash mid-write must not corrupt the user's entire Claude config.
+    const tmp = SETTINGS_PATH + '.tmp';
+    fs.writeFileSync(tmp, JSON.stringify(settings, null, 2) + '\n', 'utf-8');
+    fs.renameSync(tmp, SETTINGS_PATH);
   } catch (e) {
     console.error(`ERROR: Could not write settings.json: ${e.message}`);
     console.error('Hooks were NOT removed from disk.');
+    if (silent) return;
     process.exit(1);
   }
 
   if (removedCount === 0) {
-    console.log('No dashboard hooks found. Settings unchanged.');
+    log('No dashboard hooks found. Settings unchanged.');
   } else {
-    console.log(`\nRemoved ${removedCount} hook(s). Settings updated.`);
+    log(`\nRemoved ${removedCount} hook(s). Settings updated.`);
   }
 
   if (fs.existsSync(DATA_DIR)) {
@@ -89,17 +103,26 @@ function run(args = []) {
       .reverse();
 
     if (backups.length > 0) {
-      console.log(`\nBackup available: ${path.join(DATA_DIR, backups[0])}`);
-      console.log(
-        'To fully restore original settings, copy the backup manually.'
-      );
+      log(`\nBackup available: ${path.join(DATA_DIR, backups[0])}`);
+      log('To fully restore original settings, copy the backup manually.');
     }
   }
 
-  console.log('\nDashboard hooks removed. Claude Code settings restored.');
-  console.log(
-    'Note: Event data in ~/.llmboard/ is preserved. Delete manually if desired.'
-  );
+  if (purge) purgeData(log);
+
+  log('\nDashboard hooks removed. Claude Code settings restored.');
+  if (!purge) {
+    log('Note: Event data in ~/.llmboard/ is preserved. Run "llmboard remove --purge" to delete it.');
+  }
+}
+
+function purgeData(log) {
+  try {
+    fs.rmSync(DATA_DIR, { recursive: true, force: true });
+    log(`\nDeleted all data in ${DATA_DIR}`);
+  } catch (e) {
+    console.error(`Could not delete ${DATA_DIR}: ${e.message}`);
+  }
 }
 
 module.exports = { run };

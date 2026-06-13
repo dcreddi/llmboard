@@ -8,8 +8,11 @@ const { spawnSync } = require('child_process');
 const HOME = os.homedir();
 const SETTINGS_PATH = path.join(HOME, '.claude', 'settings.json');
 const DATA_DIR = path.join(HOME, '.llmboard');
-const HOOK_SCRIPT = path.resolve(__dirname, '../../hooks/event-logger.sh');
-const DASHBOARD_MARKER = 'llmboard';
+// Cross-platform Node logger — runs on macOS/Linux/Windows with no bash/jq dependency.
+const HOOK_LOGGER = path.resolve(__dirname, '../../hooks/event-logger.js');
+// Identify our hook by the logger filename (stable across install locations), NOT the
+// brand string — matching "llmboard" missed local-clone paths and appended duplicates.
+const DASHBOARD_MARKER = 'event-logger';
 
 const HOOK_EVENTS = [
   'PreToolUse', 'PostToolUse', 'Stop', 'SubagentStop',
@@ -19,9 +22,10 @@ const HOOK_EVENTS = [
 // ── Claude Code hooks ──────────────────────────────────────────────────────
 
 function createHookEntry() {
+  // Invoke via the current Node binary so the hook works on every platform.
   return {
     matcher: '*',
-    hooks: [{ type: 'command', command: `bash "${HOOK_SCRIPT}"`, timeout: 10 }],
+    hooks: [{ type: 'command', command: `"${process.execPath}" "${HOOK_LOGGER}"`, timeout: 10 }],
   };
 }
 
@@ -41,7 +45,11 @@ function installClaudeHooks() {
       process.exit(1);
     }
     const backup = path.join(DATA_DIR, `settings-backup.${Date.now()}.json`);
-    try { fs.copyFileSync(SETTINGS_PATH, backup); } catch {}
+    try {
+      fs.copyFileSync(SETTINGS_PATH, backup);
+    } catch (e) {
+      console.error(`  ⚠ Could not back up settings.json before editing: ${e.message}`);
+    }
   } else {
     fs.mkdirSync(path.dirname(SETTINGS_PATH), { recursive: true });
   }
@@ -59,8 +67,10 @@ function installClaudeHooks() {
     }
   }
 
-  fs.writeFileSync(SETTINGS_PATH, JSON.stringify(settings, null, 2) + '\n');
-  try { fs.chmodSync(HOOK_SCRIPT, '755'); } catch {}
+  // Atomic write: a crash mid-write must not corrupt the user's entire Claude config.
+  const tmp = SETTINGS_PATH + '.tmp';
+  fs.writeFileSync(tmp, JSON.stringify(settings, null, 2) + '\n');
+  fs.renameSync(tmp, SETTINGS_PATH);
   console.log(`  ✓ Hooks installed for ${HOOK_EVENTS.length} events`);
 }
 

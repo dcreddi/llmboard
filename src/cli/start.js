@@ -2,10 +2,11 @@
 
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 const { spawn } = require('child_process');
 
 async function run(args = []) {
-  const DATA_DIR = path.join(process.env.HOME, '.llmboard');
+  const DATA_DIR = path.join(os.homedir(), '.llmboard');
   const CONFIG_FILE = path.join(DATA_DIR, 'config.json');
 
   let port = null;
@@ -31,7 +32,7 @@ async function run(args = []) {
   if (!port) port = config.port || 3456;
   if (config.auto_open_browser === false) noOpen = true;
 
-  const settingsPath = path.join(process.env.HOME, '.claude', 'settings.json');
+  const settingsPath = path.join(os.homedir(), '.claude', 'settings.json');
   let hooksInstalled = false;
   try {
     const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
@@ -43,7 +44,7 @@ async function run(args = []) {
             if (
               entry.hooks &&
               entry.hooks.some(
-                (h) => h.command && h.command.includes('llmboard')
+                (h) => h.command && h.command.includes('event-logger')
               )
             ) {
               hooksInstalled = true;
@@ -83,8 +84,13 @@ async function run(args = []) {
 }
 
 function startShareTunnel(port) {
+  // The server enforces a loopback Host-header allowlist (DNS-rebinding defense), so the
+  // tunnel must present a localhost Host or every request 403s. --http-host-header rewrites it.
   // Requires cloudflared — https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/
-  const cf = spawn('cloudflared', ['tunnel', '--url', `http://localhost:${port}`], {
+  const cf = spawn('cloudflared', [
+    'tunnel', '--url', `http://localhost:${port}`,
+    '--http-host-header', `localhost:${port}`,
+  ], {
     stdio: ['ignore', 'pipe', 'pipe'],
   });
 
@@ -98,7 +104,9 @@ function startShareTunnel(port) {
     const match = text.match(/https:\/\/[a-z0-9\-]+\.trycloudflare\.com/);
     if (match) {
       console.log(`\n\x1b[32mShare URL: ${match[0]}\x1b[0m`);
-      console.log('\x1b[90mAnyone with this link can view your dashboard.\x1b[0m\n');
+      console.log('\x1b[1;31mWARNING: this link is PUBLIC and UNAUTHENTICATED.\x1b[0m');
+      console.log('\x1b[90mAnyone with it can read your command log (which may contain secrets)\x1b[0m');
+      console.log('\x1b[90mand change dashboard config. Only share on a trusted network; Ctrl+C to stop.\x1b[0m\n');
     }
   };
   cf.stdout.on('data', onData);

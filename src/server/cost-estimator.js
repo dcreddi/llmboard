@@ -16,11 +16,25 @@ class CostEstimator {
   }
 
   estimateEventCost(event, modelOverride) {
-    const modelPricing = this.pricing[modelOverride || this.model] || this.pricing['sonnet-4'];
+    const modelPricing =
+      this.pricing[modelOverride || this.model] || this.pricing['sonnet-4'];
 
-    const inputTokens = this.estimateTokens(event.tool_input);
-    // tool_result counts as Claude's next-turn input, but displayed as "output" since it's the tool's response
-    const outputTokens = this.estimateTokens(event.tool_result);
+    // A tool call fires both PreToolUse and PostToolUse, and both payloads carry
+    // tool_input — so attribute input to Pre and output to Post to avoid counting
+    // the input twice. Claude Code names the output `tool_response`.
+    const toolResult =
+      event.tool_response !== undefined ? event.tool_response : event.tool_result;
+
+    let inputTokens = 0;
+    let outputTokens = 0;
+    if (event.hook_event_name === 'PostToolUse') {
+      outputTokens = this.estimateTokens(toolResult);
+    } else if (event.hook_event_name === 'PreToolUse') {
+      inputTokens = this.estimateTokens(event.tool_input);
+    } else {
+      inputTokens = this.estimateTokens(event.tool_input);
+      outputTokens = this.estimateTokens(toolResult);
+    }
 
     const cost =
       (inputTokens / 1_000_000) * modelPricing.input +

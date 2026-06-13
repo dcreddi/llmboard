@@ -2,13 +2,14 @@
 
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 const { execFileSync } = require('child_process');
 const net = require('net');
 
-const DATA_DIR = path.join(process.env.HOME, '.llmboard');
+const DATA_DIR = path.join(os.homedir(), '.llmboard');
 const EVENTS_FILE = path.join(DATA_DIR, 'events.jsonl');
-const SETTINGS_PATH = path.join(process.env.HOME, '.claude', 'settings.json');
-const HOOK_SCRIPT = path.resolve(__dirname, '../../hooks/event-logger.sh');
+const SETTINGS_PATH = path.join(os.homedir(), '.claude', 'settings.json');
+const HOOK_LOGGER = path.resolve(__dirname, '../../hooks/event-logger.js');
 
 function check(label, fn) {
   try {
@@ -84,7 +85,7 @@ async function run() {
       }
       var hasDashboard = entries.some(function(e) {
         return e.hooks && e.hooks.some(function(h) {
-          return h.command && h.command.includes('llmboard');
+          return h.command && h.command.includes('event-logger');
         });
       });
       if (hasDashboard) found.push(event);
@@ -132,10 +133,8 @@ async function run() {
     return eventCount.toLocaleString() + ' events (' + sizeKb + ' KB)';
   });
 
-  var scriptOk = check('event-logger.sh is executable', function() {
-    if (!fs.existsSync(HOOK_SCRIPT)) throw new Error('Not found at ' + HOOK_SCRIPT);
-    var stat = fs.statSync(HOOK_SCRIPT);
-    if (!(stat.mode & 0o100)) throw new Error('Not executable. Run: chmod +x ' + HOOK_SCRIPT);
+  var scriptOk = check('event-logger.js present', function() {
+    if (!fs.existsSync(HOOK_LOGGER)) throw new Error('Not found at ' + HOOK_LOGGER);
     return true;
   });
   allPassed = allPassed && scriptOk;

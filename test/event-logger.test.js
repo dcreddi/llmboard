@@ -41,7 +41,7 @@ describe('event-logger.sh', function() {
     var result = runHook(input, tmpHome);
     assert.equal(result.status, 0, 'Script should exit 0');
 
-    var eventsFile = path.join(tmpHome, '.claude-dashboard', 'events.jsonl');
+    var eventsFile = path.join(tmpHome, '.llmboard', 'events.jsonl');
     assert.ok(fs.existsSync(eventsFile), 'events.jsonl should be created');
 
     var content = fs.readFileSync(eventsFile, 'utf-8').trim();
@@ -60,7 +60,7 @@ describe('event-logger.sh', function() {
 
     runHook(input, tmpHome);
 
-    var dataDir = path.join(tmpHome, '.claude-dashboard');
+    var dataDir = path.join(tmpHome, '.llmboard');
     assert.ok(fs.existsSync(dataDir), 'data directory should be created');
 
     fs.rmSync(tmpHome, { recursive: true, force: true });
@@ -82,7 +82,7 @@ describe('event-logger.sh', function() {
     runHook(event1, tmpHome);
     runHook(event2, tmpHome);
 
-    var eventsFile = path.join(tmpHome, '.claude-dashboard', 'events.jsonl');
+    var eventsFile = path.join(tmpHome, '.llmboard', 'events.jsonl');
     var lines = fs.readFileSync(eventsFile, 'utf-8').trim().split('\n');
     assert.equal(lines.length, 2, 'Should have 2 event lines');
 

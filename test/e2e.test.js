@@ -8,9 +8,9 @@ const os = require('os');
 const http = require('http');
 const { WebSocket } = require('ws');
 
-// Isolated temp home so server never touches ~/.claude-dashboard
+// Isolated temp home so server never touches the real ~/.llmboard
 const TEST_HOME = fs.mkdtempSync(path.join(os.tmpdir(), 'agentboard-home-'));
-const DATA_DIR = path.join(TEST_HOME, '.claude-dashboard');
+const DATA_DIR = path.join(TEST_HOME, '.llmboard');
 const EVENTS_FILE = path.join(DATA_DIR, 'events.jsonl');
 const ORIG_HOME = process.env.HOME;
 process.env.HOME = TEST_HOME;

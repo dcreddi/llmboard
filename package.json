@@ -11,7 +11,7 @@
     "setup": "node bin/cli.js setup",
     "remove": "node bin/cli.js remove",
     "test": "node --test test/*.test.js",
-    "postinstall": "node -e \"if(!process.env.CI && !process.env.LLMBOARD_SKIP_SETUP) require('child_process').spawnSync(process.execPath,['bin/cli.js','setup','--silent'],{stdio:'inherit'});\""
+    "preuninstall": "node -e \"try{require('./src/cli/remove').run(['--silent'])}catch(e){}\""
   },
   "keywords": [
     "claude",
