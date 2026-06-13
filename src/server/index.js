@@ -10,7 +10,8 @@ const { FileTailer } = require('./file-tailer');
 const { EventStore } = require('./event-store');
 const { registerRoutes } = require('./routes');
 
-const DATA_DIR = path.join(process.env.HOME || require('os').homedir(), '.llmboard');
+const DATA_DIR = path.join(require('os').homedir(), '.llmboard');
+const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]', '::1']);
 const EVENTS_FILE = path.join(DATA_DIR, 'events.jsonl');
 const CONFIG_FILE = path.join(DATA_DIR, 'config.json');
 
@@ -28,7 +29,9 @@ function findPort(preferred) {
     function tryPort(port) {
       if (port > 65535) { reject(new Error('No available ports found in range 3456–65535')); return; }
       const server = http.createServer();
-      server.listen(port, () => { server.close(() => resolve(port)); });
+      // Probe loopback only — the real server also binds 127.0.0.1, so a port free on
+      // all interfaces but taken on loopback would otherwise pass here and fail at listen.
+      server.listen(port, '127.0.0.1', () => { server.close(() => resolve(port)); });
       server.on('error', () => tryPort(port + 1));
     }
     tryPort(preferred);
@@ -62,6 +65,17 @@ async function startServer(options = {}) {
 
   const app = express();
 
+  // Host-header allowlist — defeats DNS rebinding. A malicious page can point a
+  // hostname at 127.0.0.1, but the browser still sends that hostname in Host;
+  // only genuine localhost requests carry a localhost/127.0.0.1/[::1] Host.
+  app.use((req, res, next) => {
+    const host = (req.headers.host || '').split(':')[0];
+    if (host && !LOOPBACK_HOSTS.has(host)) {
+      return res.status(403).json({ error: 'Forbidden host' });
+    }
+    next();
+  });
+
   // Security headers
   app.use((req, res, next) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -92,13 +106,27 @@ async function startServer(options = {}) {
 
   // Fallback to index.html for client-side routing
   app.get('*', (req, res) => {
-    if (!req.path.startsWith('/api/')) {
-      res.sendFile(path.join(__dirname, '../public/index.html'));
+    // Unmatched API routes must 404, not hang — returning without responding
+    // leaves the socket open until the client times out.
+    if (req.path.startsWith('/api/')) {
+      return res.status(404).json({ error: 'Not found' });
     }
+    res.sendFile(path.join(__dirname, '../public/index.html'));
   });
 
   const server = http.createServer(app);
-  const wss = new WebSocketServer({ server, path: '/ws' });
+  const wss = new WebSocketServer({
+    server,
+    path: '/ws',
+    // Reject cross-origin WS upgrades (CSWSH / DNS-rebinding). Same-origin requests
+    // from the dashboard send an Origin whose host is loopback; non-browser clients
+    // (no Origin) are allowed.
+    verifyClient: ({ origin }) => {
+      if (!origin) return true;
+      try { return LOOPBACK_HOSTS.has(new URL(origin).hostname); }
+      catch { return false; }
+    },
+  });
   const clients = new Set();
 
   // Heartbeat: ping every 30s, drop clients that don't pong back
@@ -113,6 +141,9 @@ async function startServer(options = {}) {
       }
     }
   }, 30000);
+  // Don't let the heartbeat alone keep the process alive — the HTTP server holds it
+  // open in normal operation, and this lets it exit cleanly once the server closes.
+  heartbeat.unref();
   wss.on('close', () => clearInterval(heartbeat));
 
   wss.on('connection', (ws) => {
@@ -188,6 +219,7 @@ async function startServer(options = {}) {
   const watcher = chokidar.watch(EVENTS_FILE, {
     persistent: true,
     usePolling: false,
+    ignoreInitial: true, // we already loaded existing events above; don't re-fire 'add' for them
     awaitWriteFinish: {
       stabilityThreshold: 100,
       pollInterval: 50,
@@ -206,7 +238,9 @@ async function startServer(options = {}) {
     }
   });
 
-  // Reset tailer on file rotation
+  // Reset tailer only on genuine rotation (the hook renames events.jsonl at 50MB and
+  // a fresh file is created with a new inode). ignoreInitial suppresses the startup
+  // 'add'; this fires only when the watched path is recreated.
   watcher.on('add', () => {
     try {
       tailer.reset();
@@ -223,7 +257,7 @@ async function startServer(options = {}) {
   const port = await findPort(preferredPort);
 
   return new Promise((resolve) => {
-    server.listen(port, () => {
+    server.listen(port, '127.0.0.1', () => {
       if (port !== preferredPort) {
         console.log(
           `Port ${preferredPort} in use, using ${port} instead`

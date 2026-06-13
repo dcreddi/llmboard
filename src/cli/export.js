@@ -2,9 +2,18 @@
 
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
+
+// Quote every CSV cell, double embedded quotes, and neutralize spreadsheet formula
+// injection by prefixing a leading =/+/-/@ with a single quote.
+function csvEscape(value) {
+  let s = value == null ? '' : String(value);
+  if (/^[=+\-@]/.test(s)) s = "'" + s;
+  return '"' + s.replace(/"/g, '""') + '"';
+}
 
 function run(args = []) {
-  const DATA_DIR = path.join(process.env.HOME, '.llmboard');
+  const DATA_DIR = path.join(os.homedir(), '.llmboard');
   const EVENTS_FILE = path.join(DATA_DIR, 'events.jsonl');
 
   if (!fs.existsSync(EVENTS_FILE)) {
@@ -53,12 +62,12 @@ function run(args = []) {
     const header = 'timestamp,session_id,hook_event,tool_name,cwd\n';
     const rows = events.map((e) => {
       return [
-        e.dashboard_ts || '',
-        e.session_id || '',
-        e.hook_event_name || '',
-        e.tool_name || '',
-        '"' + (e.cwd || '').replace(/"/g, '""') + '"',
-      ].join(',');
+        e.dashboard_ts,
+        e.session_id,
+        e.hook_event_name,
+        e.tool_name,
+        e.cwd,
+      ].map(csvEscape).join(',');
     });
     output = header + rows.join('\n') + '\n';
   } else {

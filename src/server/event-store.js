@@ -8,6 +8,10 @@ const { CostEstimator } = require('./cost-estimator');
 
 const MAX_RECENT_EVENTS = 1000;
 const MAX_COMMAND_LOG = 500;
+const MAX_SESSIONS = 500;            // evict oldest ended sessions beyond this
+const MAX_AGENTS_PER_SESSION = 100;
+const MAX_DANGEROUS_PER_SESSION = 100;
+const MAX_PROJECT_ROOT_CACHE = 1000;
 
 // Built-in command classification patterns
 const SAFE_PATTERNS = [
@@ -161,7 +165,10 @@ class EventStore {
     for (const event of events) {
       if (event._test) continue;
 
-      const key = `${event.session_id}|${event.dashboard_ts}|${event.hook_event_name}|${event.tool_name}`;
+      // Include a per-event discriminator (tool_use_id from Claude Code, or the logger's
+      // unique seq) so two events sharing a session/second/tool aren't treated as duplicates.
+      const uid = event.tool_use_id || event.seq || '';
+      const key = `${event.session_id}|${event.dashboard_ts}|${event.hook_event_name}|${event.tool_name}|${uid}`;
       if (this.seenEventKeys.has(key)) continue;
       this.seenEventKeys.add(key);
       // Prevent unbounded growth — evict oldest entries when cap is reached
@@ -178,7 +185,24 @@ class EventStore {
       }
     }
 
+    if (this.sessions.size > MAX_SESSIONS) this.pruneSessions();
     return processed;
+  }
+
+  // Keep memory bounded over long runs: drop the oldest non-active sessions
+  // (their token/cost totals are already folded into this.stats).
+  pruneSessions() {
+    const removable = [...this.sessions.values()]
+      .filter((s) => s.status === 'ended' || s.status === 'stopped' || s.status === 'inactive')
+      .sort((a, b) => new Date(a.lastActivity) - new Date(b.lastActivity));
+    let excess = this.sessions.size - MAX_SESSIONS;
+    for (const s of removable) {
+      if (excess-- <= 0) break;
+      this.sessions.delete(s.sessionId);
+      for (const k of this._pendingCalls.keys()) {
+        if (k.startsWith(s.sessionId + ':')) this._pendingCalls.delete(k);
+      }
+    }
   }
 
   processEvent(event) {
@@ -187,6 +211,12 @@ class EventStore {
 
     const hookEvent = event.hook_event_name;
     const ts = event.dashboard_ts || new Date().toISOString();
+
+    // Claude Code's PostToolUse payload names the tool output `tool_response`.
+    // Normalize to tool_result so cost, injection, and sensitive-data scans see it.
+    if (event.tool_result === undefined && event.tool_response !== undefined) {
+      event.tool_result = event.tool_response;
+    }
 
     if (!this.sessions.has(sessionId)) {
       this.sessions.set(sessionId, this.createSession(sessionId, event, ts));
@@ -222,9 +252,10 @@ class EventStore {
 
         if (event.tool_name) {
           this.toolCounts.set(event.tool_name, (this.toolCounts.get(event.tool_name) || 0) + 1);
+          this.trackProjectTool(event.cwd, event.tool_name);
           this.updateSkillRegistry(event.tool_name, event.tool_input, sessionId, ts);
 
-          if (event.tool_name === 'Agent') {
+          if (event.tool_name === 'Agent' || event.tool_name === 'Task') {
             session.agents.push({
               id: `agent-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
               startedAt: ts,
@@ -234,6 +265,7 @@ class EventStore {
               toolCalls: 0,
               endedAt: null,
             });
+            if (session.agents.length > MAX_AGENTS_PER_SESSION) session.agents.shift();
           }
 
           for (const url of this.extractUrls(event.tool_name, event.tool_input)) {
@@ -359,6 +391,7 @@ class EventStore {
     for (const { re, label } of DANGEROUS_BASH) {
       if (re.test(cmd)) {
         session.dangerousCommands.push({ label, ts, snippet: cmd.slice(0, 80) });
+        if (session.dangerousCommands.length > MAX_DANGEROUS_PER_SESSION) session.dangerousCommands.shift();
         const severity = session.permissionMode === 'bypassPermissions' ? 'critical' : 'warning';
         this.addAnomaly('dangerous-command', severity, sessionId,
           `Dangerous command: ${label}${session.permissionMode === 'bypassPermissions' ? ' (bypass mode!)' : ''}`, ts);
@@ -478,6 +511,9 @@ class EventStore {
   resolveProjectRoot(cwd) {
     if (!cwd || cwd === 'unknown') return null;
     if (this.projectRootCache.has(cwd)) return this.projectRootCache.get(cwd);
+    if (this.projectRootCache.size >= MAX_PROJECT_ROOT_CACHE) {
+      this.projectRootCache.delete(this.projectRootCache.keys().next().value);
+    }
 
     // spawnSync with array args — no shell, no injection risk
     const result = spawnSync('git', ['-C', cwd, 'rev-parse', '--show-toplevel'], {
@@ -513,6 +549,16 @@ class EventStore {
     const proj = this.projects.get(root);
     proj.sessions.add(sessionId);
     proj.lastActive = ts;
+  }
+
+  // cwd is already in projectRootCache from trackProject(), so this is a map lookup, not a git spawn.
+  trackProjectTool(cwd, toolName) {
+    if (!cwd || !toolName) return;
+    const root = this.resolveProjectRoot(cwd);
+    const proj = root && this.projects.get(root);
+    if (!proj) return;
+    proj.totalToolCalls++;
+    proj.toolCounts.set(toolName, (proj.toolCounts.get(toolName) || 0) + 1);
   }
 
   getSessions() {
@@ -611,7 +657,7 @@ class EventStore {
   detectModelFromTranscript(transcriptPath) {
     try {
       if (!transcriptPath || typeof transcriptPath !== 'string') return null;
-      const home = process.env.HOME || process.env.USERPROFILE || '/';
+      const home = require('os').homedir();
       const resolved = path.resolve(transcriptPath);
       if (!resolved.startsWith(home + path.sep)) return null;
       const stat = fs.statSync(resolved);
@@ -639,9 +685,14 @@ class EventStore {
 
   mapModelId(modelId) {
     const id = modelId.toLowerCase();
-    if (id.includes('opus')) return 'opus-4';
-    if (id.includes('haiku')) return 'haiku-3.5';
-    if (id.includes('sonnet')) return 'sonnet-4';
+    const v = (...keys) => keys.find((k) => id.includes(k.replace('.', '-')) || id.includes(k));
+    // Fall back to the BASE tier (not the newest) for unrecognized versions: legacy ids
+    // like claude-opus-4-20250514 / claude-3-opus / claude-3-haiku price ~3-4x differently
+    // from current models, so defaulting to the newest tier would badly mis-cost them.
+    if (id.includes('fable')) return 'fable-5';
+    if (id.includes('opus')) return v('4.8', '4.7', '4.6', '4.5', '4.1') ? `opus-${v('4.8', '4.7', '4.6', '4.5', '4.1')}` : 'opus-4';
+    if (id.includes('haiku')) return v('4.5', '3.5') ? `haiku-${v('4.5', '3.5')}` : 'haiku-3.5';
+    if (id.includes('sonnet')) return v('4.6', '4.5') ? `sonnet-${v('4.6', '4.5')}` : 'sonnet-4';
     return null;
   }
 

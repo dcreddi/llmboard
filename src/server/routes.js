@@ -2,6 +2,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 // spawnSync with array args — no shell invocation, no injection risk
 const { spawnSync } = require('child_process');
 
@@ -178,7 +179,10 @@ function registerRoutes(app, eventStore, dataDir) {
   app.get('/api/git', (req, res) => {
     const cwd = req.query.cwd;
     if (!cwd) return res.status(400).json({ error: 'cwd required' });
-    const home = process.env.HOME || '/';
+    // realpath BOTH sides — comparing a realpath'd cwd to a raw home rejects valid
+    // paths on systems where home contains a symlink component (macOS /var→/private/var).
+    let home;
+    try { home = fs.realpathSync(os.homedir()); } catch { home = os.homedir(); }
     let resolved;
     try {
       resolved = fs.realpathSync(path.resolve(cwd));
